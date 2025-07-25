@@ -25,7 +25,7 @@
   <ul>
     {{#each playlist}}
       <li>
-        <span>https://youtu.be/{{this.id}}</span>
+        <span>{{#if this.label}}{{this.label}}{{else}}https://youtu.be/{{this.id}}{{/if}}</span>
         {{#if ../isGM}}
           <button class="play-video" data-id="{{this.id}}">▶</button>
         {{/if}}
