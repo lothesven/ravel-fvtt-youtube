@@ -1,11 +1,16 @@
 <div class="youtube-widget-container">
   {{#if isGM}}
     <label>YouTube URL:</label>
-    <input type="text" id="yt-url-{{appId}}" value="{{current}}" placeholder="https://www.youtube.com/watch?v=xxxxxx"/>
+    <input type="text" id="yt-url-{{appId}}" placeholder="https://www.youtube.com/watch?v=xxxxxx"/>
     <button id="add-to-playlist-{{appId}}">Add to Playlist</button>
   {{/if}}
 
-  <div id="yt-player-{{appId}}"></div>
+  {{#if currentEmbed}}
+    <iframe id="yt-player-{{appId}}" src="{{currentEmbed}}" frameborder="0" allowfullscreen></iframe>
+  {{else}}
+    <p>No video loaded yet.</p>
+    <div id="yt-player-{{appId}}"></div>
+  {{/if}}
 
   {{#if isGM}}
     <div class="yt-controls">
@@ -18,13 +23,13 @@
   <hr/>
   <h4>Playlist</h4>
   <ul>
-  {{#each playlist}}
-    <li>
-      {{this}}
-      {{#if ../isGM}}
-        <button class="play-video" data-url="{{this}}">▶</button>
-      {{/if}}
-    </li>
-  {{/each}}
+    {{#each playlist}}
+      <li>
+        <span>https://youtu.be/{{this.id}}</span>
+        {{#if ../isGM}}
+          <button class="play-video" data-id="{{this.id}}">▶</button>
+        {{/if}}
+      </li>
+    {{/each}}
   </ul>
 </div>
