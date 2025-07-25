@@ -1,4 +1,7 @@
 class RavelYoutube extends Application {
+  static player = null;
+  static isReady = false;
+
   static get defaultOptions() {
     return mergeObject(super.defaultOptions, {
       id: "ravel-fvtt-youtube",
@@ -11,34 +14,93 @@ class RavelYoutube extends Application {
   }
 
   getData() {
-    // Charge la vidéo courante et la playlist
     const current = game.settings.get("ravel-fvtt-youtube", "currentVideo") || "";
     const playlist = game.settings.get("ravel-fvtt-youtube", "playlist") || [];
     const isGM = game.user.isGM;
-    const embed = this._convertToEmbed(current);
-    return { current, embed, playlist, isGM };
+    return { current, playlist, isGM };
   }
 
   activateListeners(html) {
     super.activateListeners(html);
+
+    // Charger API YouTube si non présent
+    if (!window.YT) this._loadYouTubeAPI();
+
     if (game.user.isGM) {
-      // Quand le MJ change l’URL
       html.find("#yt-url").on("change", ev => {
         const url = ev.target.value;
         this._setCurrentVideo(url);
       });
-
-      // Ajout à la playlist
       html.find("#add-to-playlist").on("click", ev => {
         const url = html.find("#yt-url").val();
         if (url) this._addToPlaylist(url);
       });
-
-      // Lecture depuis la playlist
       html.find(".play-video").on("click", ev => {
         const url = ev.currentTarget.dataset.url;
         this._setCurrentVideo(url);
       });
+
+      // Boutons synchro
+      html.find("#yt-play").on("click", () => this._broadcastState("play"));
+      html.find("#yt-pause").on("click", () => this._broadcastState("pause"));
+      html.find("#yt-sync").on("click", () => this._broadcastState("sync"));
+    }
+  }
+
+  _loadYouTubeAPI() {
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+
+    window.onYouTubeIframeAPIReady = () => {
+      console.log("YouTube API loaded");
+      this._initPlayer();
+    };
+  }
+
+  _initPlayer() {
+    const container = document.getElementById("yt-player");
+    if (!container) return;
+
+    const url = game.settings.get("ravel-fvtt-youtube", "currentVideo");
+    const videoId = this._extractVideoId(url);
+
+    YoutubeWidgetAdvanced.player = new YT.Player("yt-player", {
+      videoId: videoId,
+      playerVars: { modestbranding: 1 },
+      events: {
+        onReady: () => {
+          YoutubeWidgetAdvanced.isReady = true;
+        }
+      }
+    });
+  }
+
+  _broadcastState(state) {
+    if (!YoutubeWidgetAdvanced.player) return;
+
+    const time = YoutubeWidgetAdvanced.player.getCurrentTime();
+    game.socket.emit("module.ravel-fvtt-youtube", {
+      action: "videoControl",
+      state,
+      time
+    });
+
+    // Applique localement
+    this._applyState(state, time);
+  }
+
+  _applyState(state, time) {
+    const player = YoutubeWidgetAdvanced.player;
+    if (!player) return;
+
+    if (state === "play") {
+      player.seekTo(time, true);
+      player.playVideo();
+    } else if (state === "pause") {
+      player.pauseVideo();
+    } else if (state === "sync") {
+      player.seekTo(time, true);
     }
   }
 
@@ -55,16 +117,14 @@ class RavelYoutube extends Application {
     this.render(true);
   }
 
-  _convertToEmbed(url) {
+  _extractVideoId(url) {
     if (!url) return "";
-    const videoId = url.split("v=")[1]?.split("&")[0];
-    return `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
+    const match = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : "";
   }
 }
 
-// Initialisation du module
 Hooks.once("init", () => {
-  // Enregistre les paramètres persistants
   game.settings.register("ravel-fvtt-youtube", "currentVideo", {
     scope: "world",
     config: false,
@@ -78,19 +138,21 @@ Hooks.once("init", () => {
     default: []
   });
 
-  // Réception des sockets
-  game.socket.on("module.ravel-fvtt-youtube", data => {
+  game.socket.on("module.youtube-widget-advanced", data => {
     if (data.action === "setVideo") {
       game.settings.set("ravel-fvtt-youtube", "currentVideo", data.url);
       if (ui.windows["ravel-fvtt-youtube"]) ui.windows["ravel-fvtt-youtube"].render(true);
+    } else if (data.action === "videoControl") {
+      if (ui.windows["ravel-fvtt-youtube"]) {
+        ui.windows["ravel-fvtt-youtube"]._applyState(data.state, data.time);
+      }
     }
   });
 
-  // Ajoute un bouton dans la barre Foundry
   Hooks.on("getSceneControlButtons", controls => {
     controls.push({
       name: "ravel-fvtt-youtube",
-      title: "Ravel Youtube",
+      title: "Ravel YouTube",
       icon: "fab fa-youtube",
       onClick: () => {
         new YoutubeWidgetAdvanced().render(true);
@@ -98,3 +160,4 @@ Hooks.once("init", () => {
     });
   });
 });
+
