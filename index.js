@@ -16,52 +16,52 @@ class RavelYoutube extends Application {
   }
 
   getData() {
-    const current = game.settings.get("ravel-fvtt-youtube", "currentVideo") || "";
+    const currentId = game.settings.get("ravel-fvtt-youtube", "currentVideoId") || "";
     const playlist = game.settings.get("ravel-fvtt-youtube", "playlist") || [];
     const isGM = game.user.isGM;
+
     return {
-      current,
+      currentEmbed: currentId ? `https://www.youtube.com/embed/${currentId}` : "",
       playlist,
       isGM,
-      appId: this.appId // ID unique DOM
+      appId: this.appId
     };
   }
 
   activateListeners(html) {
     super.activateListeners(html);
 
-    // Charger l’API une seule fois
     this._loadYouTubeAPI();
 
     if (game.user.isGM) {
-      // Champ URL
+      // Ajout vidéo
       html.find(`#yt-url-${this.appId}`).on("change", ev => {
-        const url = ev.target.value;
+        const url = ev.target.value.trim();
         this._setCurrentVideo(url);
       });
 
-      // Ajouter à playlist
       html.find(`#add-to-playlist-${this.appId}`).on("click", () => {
-        const url = html.find(`#yt-url-${this.appId}`).val();
+        const url = html.find(`#yt-url-${this.appId}`).val().trim();
         this._addToPlaylist(url);
       });
 
       // Lecture depuis playlist
       html.find(`.play-video`).on("click", ev => {
-        const url = ev.currentTarget.dataset.url;
-        this._setCurrentVideo(url);
+        const id = ev.currentTarget.dataset.id;
+        this._setCurrentVideoFromId(id);
       });
 
-      // Boutons Play/Pause/Sync
+      // Contrôles synchro
       html.find(`#yt-play-${this.appId}`).on("click", () => this._broadcastState("play"));
       html.find(`#yt-pause-${this.appId}`).on("click", () => this._broadcastState("pause"));
       html.find(`#yt-sync-${this.appId}`).on("click", () => this._broadcastState("sync"));
     }
   }
 
+  /** ✅ Charger l’API YouTube une seule fois */
   _loadYouTubeAPI() {
-    if (window.YT && window.YT.Player) return; // déjà chargé
-    if (RavelYoutube.apiLoading) return; // déjà en cours
+    if (window.YT && window.YT.Player) return;
+    if (RavelYoutube.apiLoading) return;
 
     RavelYoutube.apiLoading = true;
     const tag = document.createElement("script");
@@ -75,21 +75,17 @@ class RavelYoutube extends Application {
     };
   }
 
+  /** ✅ Initialise le player avec l’ID courant */
   _initPlayer() {
     const containerId = `yt-player-${this.appId}`;
     const container = document.getElementById(containerId);
-    if (!container) {
-      return ui.notifications.error("YouTube player container not found");
-    }
+    if (!container) return ui.notifications.error("YouTube player container not found");
 
-    const url = game.settings.get("ravel-fvtt-youtube", "currentVideo");
-    const videoId = this._extractVideoId(url);
-    if (!videoId) {
-      return ui.notifications.warn("No valid YouTube video loaded yet.");
-    }
+    const videoId = game.settings.get("ravel-fvtt-youtube", "currentVideoId");
+    if (!videoId) return;
 
     RavelYoutube.player = new YT.Player(containerId, {
-      videoId: videoId,
+      videoId,
       playerVars: { modestbranding: 1 },
       events: {
         onReady: () => {
@@ -100,6 +96,7 @@ class RavelYoutube extends Application {
     });
   }
 
+  /** ✅ Envoie lecture/pause/seek à tous les joueurs */
   _broadcastState(state) {
     const player = RavelYoutube.player;
     if (!player || !RavelYoutube.isReady) return;
@@ -111,12 +108,7 @@ class RavelYoutube extends Application {
       console.warn("⚠ Unable to get current time", err);
     }
 
-    game.socket.emit(RavelYoutube.socketChannel, {
-      action: "videoControl",
-      state,
-      time
-    });
-
+    game.socket.emit(RavelYoutube.socketChannel, { action: "videoControl", state, time });
     this._applyState(state, time);
   }
 
@@ -134,41 +126,79 @@ class RavelYoutube extends Application {
     }
   }
 
+  /** ✅ Définit une vidéo comme courante (depuis URL) */
   _setCurrentVideo(url) {
     const videoId = this._extractVideoId(url);
-    if (!videoId) return ui.notifications.error("❌ Invalid YouTube URL");
+    if (!videoId) return ui.notifications.error("❌ Invalid or non-YouTube URL");
 
-    game.settings.set("ravel-fvtt-youtube", "currentVideo", url);
-    game.socket.emit(RavelYoutube.socketChannel, { action: "setVideo", url });
+    game.settings.set("ravel-fvtt-youtube", "currentVideoId", videoId);
+    game.socket.emit(RavelYoutube.socketChannel, { action: "setVideo", id: videoId });
     this.render(true);
   }
 
+  /** ✅ Définit une vidéo courante directement par ID */
+  _setCurrentVideoFromId(videoId) {
+    if (!this._validateVideoId(videoId)) return ui.notifications.error("❌ Invalid YouTube ID");
+
+    game.settings.set("ravel-fvtt-youtube", "currentVideoId", videoId);
+    game.socket.emit(RavelYoutube.socketChannel, { action: "setVideo", id: videoId });
+    this.render(true);
+  }
+
+  /** ✅ Ajoute une vidéo à la playlist (stockage ID uniquement) */
   _addToPlaylist(url) {
     const videoId = this._extractVideoId(url);
-    if (!videoId) return ui.notifications.error("❌ Invalid YouTube URL");
+    if (!videoId) return ui.notifications.error("❌ Invalid or non-YouTube URL");
 
     let playlist = game.settings.get("ravel-fvtt-youtube", "playlist") || [];
-    if (!playlist.includes(url)) playlist.push(url);
-    game.settings.set("ravel-fvtt-youtube", "playlist", playlist);
-    this.render(true);
+    if (!playlist.find(v => v.id === videoId)) {
+      playlist.push({ id: videoId });
+      game.settings.set("ravel-fvtt-youtube", "playlist", playlist);
+      this.render(true);
+    } else {
+      ui.notifications.info("✅ Video already in playlist");
+    }
   }
 
+  /** ✅ Extraction d’un ID valide */
   _extractVideoId(url) {
     if (!url) return "";
-    // Support watch?v=, youtu.be/, /embed/
-    const match = url.match(/(?:v=|youtu\.be\/|\/embed\/)([a-zA-Z0-9_-]{11})/);
-    return match ? match[1] : "";
+    try {
+      const parsed = new URL(url);
+      const domain = parsed.hostname.replace("www.", "");
+      if (!["youtube.com", "youtu.be"].includes(domain)) return "";
+
+      // support watch?v=xxx
+      if (parsed.searchParams.has("v")) {
+        const id = parsed.searchParams.get("v");
+        return this._validateVideoId(id) ? id : "";
+      }
+
+      // support youtu.be/xxx ou embed/xxx
+      const match = url.match(/(?:youtu\.be\/|\/embed\/)([a-zA-Z0-9_-]{11})/);
+      if (match) return match[1];
+
+      return "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  /** ✅ Validation stricte d’un ID YouTube */
+  _validateVideoId(id) {
+    return typeof id === "string" && /^[a-zA-Z0-9_-]{11}$/.test(id);
   }
 }
 
+// Initialisation du module
 Hooks.once("init", () => {
-  // Settings persistants
-  game.settings.register("ravel-fvtt-youtube", "currentVideo", {
+  game.settings.register("ravel-fvtt-youtube", "currentVideoId", {
     scope: "world",
     config: false,
     type: String,
     default: ""
   });
+
   game.settings.register("ravel-fvtt-youtube", "playlist", {
     scope: "world",
     config: false,
@@ -179,7 +209,7 @@ Hooks.once("init", () => {
   // Socket events
   game.socket.on(RavelYoutube.socketChannel, data => {
     if (data.action === "setVideo") {
-      game.settings.set("ravel-fvtt-youtube", "currentVideo", data.url);
+      game.settings.set("ravel-fvtt-youtube", "currentVideoId", data.id);
       if (ui.windows["ravel-fvtt-youtube"]) ui.windows["ravel-fvtt-youtube"].render(true);
     } else if (data.action === "videoControl") {
       if (ui.windows["ravel-fvtt-youtube"]) {
@@ -188,15 +218,12 @@ Hooks.once("init", () => {
     }
   });
 
-  // Bouton dans la barre de scène
   Hooks.on("getSceneControlButtons", controls => {
     controls.push({
       name: "ravel-fvtt-youtube",
       title: "Ravel Youtube",
       icon: "fab fa-youtube",
-      onClick: () => {
-        new RavelYoutube().render(true);
-      }
+      onClick: () => new RavelYoutube().render(true)
     });
   });
 });
