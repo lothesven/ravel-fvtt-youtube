@@ -1,0 +1,17 @@
+.youtube-widget-container {
+  padding: 8px;
+  font-family: sans-serif;
+}
+.youtube-widget-container iframe {
+  width: 100%;
+  height: 360px;
+}
+.youtube-widget-container ul {
+  list-style: none;
+  padding-left: 0;
+}
+.youtube-widget-container li {
+  margin: 5px 0;
+  display: flex;
+  justify-content: space-between;
+}
