@@ -1,18 +1,17 @@
 <div class="youtube-widget-container">
   {{#if isGM}}
     <label>YouTube URL:</label>
-    <input type="text" id="yt-url" value="{{current}}" placeholder="https://www.youtube.com/watch?v=xxxxxx"/>
-    <button id="add-to-playlist">Add to Playlist</button>
+    <input type="text" id="yt-url-{{appId}}" value="{{current}}" placeholder="https://www.youtube.com/watch?v=xxxxxx"/>
+    <button id="add-to-playlist-{{appId}}">Add to Playlist</button>
   {{/if}}
 
-  <!-- Player container -->
-  <div id="yt-player"></div>
+  <div id="yt-player-{{appId}}"></div>
 
   {{#if isGM}}
     <div class="yt-controls">
-      <button id="yt-play">▶ Play</button>
-      <button id="yt-pause">⏸ Pause</button>
-      <button id="yt-sync">🔄 Sync</button>
+      <button id="yt-play-{{appId}}">▶ Play</button>
+      <button id="yt-pause-{{appId}}">⏸ Pause</button>
+      <button id="yt-sync-{{appId}}">🔄 Sync</button>
     </div>
   {{/if}}
 
