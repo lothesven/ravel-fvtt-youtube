@@ -1,0 +1,26 @@
+<div class="youtube-widget-container">
+  {{#if isGM}}
+    <label>YouTube URL:</label>
+    <input type="text" id="yt-url" value="{{current}}" placeholder="https://www.youtube.com/watch?v=xxxxxx"/>
+    <button id="add-to-playlist">Add to Playlist</button>
+  {{/if}}
+
+  {{#if embed}}
+    <iframe width="640" height="360" src="{{embed}}" frameborder="0" allowfullscreen></iframe>
+  {{else}}
+    <p>No video loaded yet.</p>
+  {{/if}}
+
+  <hr/>
+  <h4>Playlist</h4>
+  <ul>
+  {{#each playlist}}
+    <li>
+      {{this}}
+      {{#if ../isGM}}
+        <button class="play-video" data-url="{{this}}">▶</button>
+      {{/if}}
+    </li>
+  {{/each}}
+  </ul>
+</div>
