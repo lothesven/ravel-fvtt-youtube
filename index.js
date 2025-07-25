@@ -145,20 +145,44 @@ class RavelYoutube extends Application {
     this.render(true);
   }
 
-  /** ✅ Ajoute une vidéo à la playlist (stockage ID uniquement) */
+  /** ✅ Ajoute une vidéo à la playlist (stockage ID uniquement) avec un label en input*/
   _addToPlaylist(url) {
     const videoId = this._extractVideoId(url);
     if (!videoId) return ui.notifications.error("❌ Invalid or non-YouTube URL");
-
-    let playlist = game.settings.get("ravel-fvtt-youtube", "playlist") || [];
-    if (!playlist.find(v => v.id === videoId)) {
-      playlist.push({ id: videoId });
-      game.settings.set("ravel-fvtt-youtube", "playlist", playlist);
-      this.render(true);
-    } else {
-      ui.notifications.info("✅ Video already in playlist");
-    }
+  
+    // Demander un titre au GM (dialogue simple)
+    new Dialog({
+      title: "Add Video to Playlist",
+      content: `
+        <div>
+          <label>Optional title:</label>
+          <input type="text" id="yt-title" placeholder="My cool video title" style="width:100%"/>
+        </div>
+      `,
+      buttons: {
+        ok: {
+          label: "Add",
+          callback: html => {
+            const title = html.find("#yt-title").val().trim() || `https://youtu.be/${videoId}`;
+  
+            let playlist = game.settings.get("ravel-fvtt-youtube", "playlist") || [];
+            if (!playlist.find(v => v.id === videoId)) {
+              playlist.push({ id: videoId, label: title });
+              game.settings.set("ravel-fvtt-youtube", "playlist", playlist);
+              this.render(true);
+              ui.notifications.info(`✅ Added "${title}" to playlist`);
+            } else {
+              ui.notifications.info("✅ Video already in playlist");
+            }
+          }
+        },
+        cancel: {
+          label: "Cancel"
+        }
+      }
+    }).render(true);
   }
+
 
   /** ✅ Extraction d’un ID valide */
   _extractVideoId(url) {
