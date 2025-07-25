@@ -54,6 +54,12 @@ class RavelYoutube extends Application {
         this._addToPlaylist(url);
       });
 
+      // Suppression vidéo de la playlist
+      html.find(`.delete-video`).on("click", ev => {
+        const id = ev.currentTarget.dataset.id;
+        this._removeFromPlaylist(id);
+      });
+
       // Lecture depuis la playlist
       html.find(`.play-video`).on("click", ev => {
         const id = ev.currentTarget.dataset.id;
@@ -211,6 +217,29 @@ class RavelYoutube extends Application {
         cancel: {
           label: "Cancel"
         }
+      }
+    }).render(true);
+  }
+
+  _removeFromPlaylist(videoId) {
+    let playlist = game.settings.get("ravel-fvtt-youtube", "playlist") || [];
+    const entry = playlist.find(v => v.id === videoId);
+    if (!entry) return;
+  
+    new Dialog({
+      title: "Remove Video",
+      content: `<p>Are you sure you want to remove <b>${entry.label || videoId}</b> from the playlist?</p>`,
+      buttons: {
+        ok: {
+          label: "Remove",
+          callback: () => {
+            playlist = playlist.filter(v => v.id !== videoId);
+            game.settings.set("ravel-fvtt-youtube", "playlist", playlist);
+            this.render(true);
+            ui.notifications.info("🗑️ Video removed from playlist");
+          }
+        },
+        cancel: { label: "Cancel" }
       }
     }).render(true);
   }
