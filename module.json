@@ -1,0 +1,17 @@
+{
+  "id": "ravel-fvtt-youtube",
+  "title": "Ravel YouTube",
+  "description": "An advanced YouTube player widget for Foundry VTT with playlist and synchronized controls",
+  "version": "0.1.0",
+  "authors": [
+    {
+      "name": "Custom Build",
+      "url": "https://github.com/lothesven/ravel-fvtt-youtube"
+    }
+  ],
+  "esmodules": ["index.js"],
+  "styles": ["styles/module.css"],
+  "manifest": "https://raw.githubusercontent.com/lothesven/ravel-fvtt-youtube/main/module.json",
+  "download": "https://github.com/lothesven/ravel-fvtt-youtube/archive/refs/heads/main.zip",
+  "compatibleCoreVersion": "13"
+}
