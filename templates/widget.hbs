@@ -5,10 +5,15 @@
     <button id="add-to-playlist">Add to Playlist</button>
   {{/if}}
 
-  {{#if embed}}
-    <iframe width="640" height="360" src="{{embed}}" frameborder="0" allowfullscreen></iframe>
-  {{else}}
-    <p>No video loaded yet.</p>
+  <!-- Player container -->
+  <div id="yt-player"></div>
+
+  {{#if isGM}}
+    <div class="yt-controls">
+      <button id="yt-play">▶ Play</button>
+      <button id="yt-pause">⏸ Pause</button>
+      <button id="yt-sync">🔄 Sync</button>
+    </div>
   {{/if}}
 
   <hr/>
