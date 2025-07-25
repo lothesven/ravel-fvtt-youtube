@@ -23,11 +23,11 @@ A **lightweight YouTube player widget** for Foundry VTT with:
 
 ## 🔧 Installation
 
-### Direct install (once repo is live)
+### Direct install
+
 Paste this manifest URL in **Foundry → Add-on Modules → Install Module**:
 
-https://raw.githubusercontent.com/<YourGitHubName>/youtube-widget-advanced/main/module.json
-
+https://raw.githubusercontent.com/lothesven/ravel-fvtt-youtube/main/module.json
 
 ### Manual install
 - Download the ZIP from GitHub and extract it into:  
