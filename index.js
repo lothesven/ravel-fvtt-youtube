@@ -17,13 +17,21 @@ class RavelYoutube extends Application {
 
   getData() {
     const currentId = game.settings.get("ravel-fvtt-youtube", "currentVideoId") || "";
-    const playlist = game.settings.get("ravel-fvtt-youtube", "playlist") || [];
-    const isGM = game.user.isGM;
+    const fullPlaylist = game.settings.get("ravel-fvtt-youtube", "playlist") || [];
+
+    // Pagination basique : 10 vidéos/page
+    const page = this.page || 1;
+    const perPage = 10;
+    const start = (page - 1) * perPage;
+    const paginated = fullPlaylist.slice(start, start + perPage);
+    const totalPages = Math.max(1, Math.ceil(fullPlaylist.length / perPage));
 
     return {
       currentEmbed: currentId ? `https://www.youtube.com/embed/${currentId}` : "",
-      playlist,
-      isGM,
+      playlist: paginated,
+      currentPage: page,
+      totalPages,
+      isGM: game.user.isGM,
       appId: this.appId
     };
   }
@@ -34,18 +42,19 @@ class RavelYoutube extends Application {
     this._loadYouTubeAPI();
 
     if (game.user.isGM) {
-      // Ajout vidéo
+      // Champ URL
       html.find(`#yt-url-${this.appId}`).on("change", ev => {
         const url = ev.target.value.trim();
         this._setCurrentVideo(url);
       });
 
+      // Ajout en playlist
       html.find(`#add-to-playlist-${this.appId}`).on("click", () => {
         const url = html.find(`#yt-url-${this.appId}`).val().trim();
         this._addToPlaylist(url);
       });
 
-      // Lecture depuis playlist
+      // Lecture depuis la playlist
       html.find(`.play-video`).on("click", ev => {
         const id = ev.currentTarget.dataset.id;
         this._setCurrentVideoFromId(id);
@@ -56,9 +65,23 @@ class RavelYoutube extends Application {
       html.find(`#yt-pause-${this.appId}`).on("click", () => this._broadcastState("pause"));
       html.find(`#yt-sync-${this.appId}`).on("click", () => this._broadcastState("sync"));
     }
+
+    // Pagination
+    html.find(".prev-page").on("click", () => {
+      if ((this.page || 1) > 1) this._changePage((this.page || 1) - 1);
+    });
+    html.find(".next-page").on("click", () => {
+      if ((this.page || 1) < this.totalPages) this._changePage((this.page || 1) + 1);
+    });
   }
 
-  /** ✅ Charger l’API YouTube une seule fois */
+  /** ✅ Changer de page dans la playlist */
+  _changePage(newPage) {
+    this.page = newPage;
+    this.render(true);
+  }
+
+  /** ✅ Charger API YouTube une seule fois */
   _loadYouTubeAPI() {
     if (window.YT && window.YT.Player) return;
     if (RavelYoutube.apiLoading) return;
@@ -75,7 +98,7 @@ class RavelYoutube extends Application {
     };
   }
 
-  /** ✅ Initialise le player avec l’ID courant */
+  /** ✅ Initialiser le player avec optimisation */
   _initPlayer() {
     const containerId = `yt-player-${this.appId}`;
     const container = document.getElementById(containerId);
@@ -83,6 +106,15 @@ class RavelYoutube extends Application {
 
     const videoId = game.settings.get("ravel-fvtt-youtube", "currentVideoId");
     if (!videoId) return;
+
+    // ✅ Optimisation : ne pas recréer si déjà le bon player
+    if (RavelYoutube.player && RavelYoutube.player.getVideoData) {
+      const currentPlayingId = RavelYoutube.player.getVideoData().video_id;
+      if (currentPlayingId === videoId) {
+        console.log("ℹ️ Player already on correct video, skipping reinit");
+        return;
+      }
+    }
 
     RavelYoutube.player = new YT.Player(containerId, {
       videoId,
@@ -96,7 +128,7 @@ class RavelYoutube extends Application {
     });
   }
 
-  /** ✅ Envoie lecture/pause/seek à tous les joueurs */
+  /** ✅ Synchroniser lecture/pause/seek */
   _broadcastState(state) {
     const player = RavelYoutube.player;
     if (!player || !RavelYoutube.isReady) return;
@@ -126,7 +158,7 @@ class RavelYoutube extends Application {
     }
   }
 
-  /** ✅ Définit une vidéo comme courante (depuis URL) */
+  /** ✅ Définir une vidéo depuis une URL brute */
   _setCurrentVideo(url) {
     const videoId = this._extractVideoId(url);
     if (!videoId) return ui.notifications.error("❌ Invalid or non-YouTube URL");
@@ -136,7 +168,7 @@ class RavelYoutube extends Application {
     this.render(true);
   }
 
-  /** ✅ Définit une vidéo courante directement par ID */
+  /** ✅ Définir une vidéo directement par ID */
   _setCurrentVideoFromId(videoId) {
     if (!this._validateVideoId(videoId)) return ui.notifications.error("❌ Invalid YouTube ID");
 
@@ -145,12 +177,12 @@ class RavelYoutube extends Application {
     this.render(true);
   }
 
-  /** ✅ Ajoute une vidéo à la playlist (stockage ID uniquement) avec un label en input*/
+  /** ✅ Ajout sécurisé d’une vidéo avec un label manuel */
   _addToPlaylist(url) {
     const videoId = this._extractVideoId(url);
     if (!videoId) return ui.notifications.error("❌ Invalid or non-YouTube URL");
-  
-    // Demander un titre au GM (dialogue simple)
+
+    // Dialog pour saisir un titre
     new Dialog({
       title: "Add Video to Playlist",
       content: `
@@ -164,8 +196,8 @@ class RavelYoutube extends Application {
           label: "Add",
           callback: html => {
             const title = html.find("#yt-title").val().trim() || `https://youtu.be/${videoId}`;
-  
             let playlist = game.settings.get("ravel-fvtt-youtube", "playlist") || [];
+
             if (!playlist.find(v => v.id === videoId)) {
               playlist.push({ id: videoId, label: title });
               game.settings.set("ravel-fvtt-youtube", "playlist", playlist);
@@ -182,7 +214,6 @@ class RavelYoutube extends Application {
       }
     }).render(true);
   }
-
 
   /** ✅ Extraction d’un ID valide */
   _extractVideoId(url) {
@@ -242,6 +273,7 @@ Hooks.once("init", () => {
     }
   });
 
+  // Bouton dans la barre de scène
   Hooks.on("getSceneControlButtons", controls => {
     controls.push({
       name: "ravel-fvtt-youtube",
