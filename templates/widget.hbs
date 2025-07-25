@@ -21,15 +21,33 @@
   {{/if}}
 
   <hr/>
-  <h4>Playlist</h4>
+
+  <h4>Playlist (Page {{currentPage}} / {{totalPages}})</h4>
   <ul>
     {{#each playlist}}
       <li>
-        <span>{{#if this.label}}{{this.label}}{{else}}https://youtu.be/{{this.id}}{{/if}}</span>
+        <!-- ✅ Affiche le label si défini, sinon fallback sur le lien -->
+        <span>
+          {{#if this.label}}
+            {{this.label}}
+          {{else}}
+            https://youtu.be/{{this.id}}
+          {{/if}}
+        </span>
         {{#if ../isGM}}
-          <button class="play-video" data-id="{{this.id}}">▶</button>
+          <button class="play-video" data-id="{{this.id}}" title="Play">▶</button>
+          <button class="delete-video" data-id="{{this.id}}" title="Remove">🗑️</button>
         {{/if}}
       </li>
     {{/each}}
   </ul>
+
+  <div class="pagination-controls">
+    {{#if (gt currentPage 1)}}
+      <button class="prev-page">⬅ Previous</button>
+    {{/if}}
+    {{#if (lt currentPage totalPages)}}
+      <button class="next-page">Next ➡</button>
+    {{/if}}
+  </div>
 </div>
